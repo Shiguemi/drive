@@ -1,4 +1,5 @@
 import os
+import datetime
 from flask import Flask, flash, request, redirect, url_for, send_from_directory, render_template
 from werkzeug.utils import secure_filename
 
@@ -13,9 +14,33 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def get_file_details(folder, filename):
+    filepath = os.path.join(folder, filename)
+    if os.path.exists(filepath):
+        stat = os.stat(filepath)
+        size = stat.st_size
+        if size < 1024:
+            size_str = f"{size} B"
+        elif size < 1024**2:
+            size_str = f"{size/1024:.2f} KB"
+        elif size < 1024**3:
+            size_str = f"{size/1024**2:.2f} MB"
+        else:
+            size_str = f"{size/1024**3:.2f} GB"
+
+        mod_time = datetime.datetime.fromtimestamp(stat.st_mtime)
+        return {
+            'name': filename,
+            'date': mod_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'size': size_str
+        }
+    return None
+
 @app.route('/')
 def index():
-    files = os.listdir(app.config['UPLOAD_FOLDER'])
+    folder = app.config['UPLOAD_FOLDER']
+    files = [get_file_details(folder, f) for f in os.listdir(folder)]
+    files = [f for f in files if f]
     return render_template('index.html', files=files)
 
 @app.route('/upload', methods=['POST'])
@@ -38,7 +63,9 @@ def uploaded_file(filename):
 
 @app.route('/files')
 def list_files():
-    files = os.listdir(app.config['UPLOAD_FOLDER'])
+    folder = app.config['UPLOAD_FOLDER']
+    files = [get_file_details(folder, f) for f in os.listdir(folder)]
+    files = [f for f in files if f]
     return {'files': files}
 
 @app.route('/delete', methods=['POST'])

@@ -8,20 +8,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const fetchFiles = async () => {
         const response = await fetch('/files');
         const data = await response.json();
-        fileList.innerHTML = '';
+        const tableBody = fileList.getElementsByTagName('tbody')[0];
+        tableBody.innerHTML = '';
         data.files.forEach(file => {
-            const li = document.createElement('li');
+            const row = tableBody.insertRow();
+
+            const cell1 = row.insertCell(0);
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.name = 'file';
-            checkbox.value = file;
-            li.appendChild(checkbox);
+            checkbox.value = file.name;
+            cell1.appendChild(checkbox);
 
+            const cell2 = row.insertCell(1);
             const a = document.createElement('a');
-            a.href = `/uploads/${file}`;
-            a.textContent = file;
-            li.appendChild(a);
-            fileList.appendChild(li);
+            a.href = `/uploads/${file.name}`;
+            a.textContent = file.name;
+            cell2.appendChild(a);
+
+            const cell3 = row.insertCell(2);
+            cell3.textContent = file.date;
+
+            const cell4 = row.insertCell(3);
+            cell4.textContent = file.size;
         });
     };
 
