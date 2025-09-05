@@ -18,14 +18,26 @@
 
     <h2>Available Files</h2>
     <button id="delete-button">Delete Selected Files</button>
-    <ul id="file-list">
-        {% for file in files %}
-        <li>
-            <input type="checkbox" name="file" value="{{ file }}">
-            <a href="{{ url_for('uploaded_file', filename=file) }}">{{ file }}</a>
-        </li>
-        {% endfor %}
-    </ul>
+    <table id="file-list">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Name</th>
+                <th>Date Modified</th>
+                <th>Size</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for file in files %}
+            <tr>
+                <td><input type="checkbox" name="file" value="{{ file.name }}"></td>
+                <td><a href="{{ url_for('uploaded_file', filename=file.name) }}">{{ file.name }}</a></td>
+                <td>{{ file.date }}</td>
+                <td>{{ file.size }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
