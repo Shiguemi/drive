@@ -1,0 +1,30 @@
+body {
+    font-family: sans-serif;
+    margin: 2em;
+}
+
+h1, h2 {
+    color: #333;
+}
+
+#upload-form {
+    margin-bottom: 2em;
+}
+
+#file-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+#file-list li {
+    margin-bottom: 0.5em;
+}
+
+#file-list a {
+    text-decoration: none;
+    color: #007bff;
+}
+
+#file-list a:hover {
+    text-decoration: underline;
+}
