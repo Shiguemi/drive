@@ -17,9 +17,13 @@
     <div id="upload-status"></div>
 
     <h2>Available Files</h2>
+    <button id="delete-button">Delete Selected Files</button>
     <ul id="file-list">
         {% for file in files %}
-            <li><a href="{{ url_for('uploaded_file', filename=file) }}">{{ file }}</a></li>
+        <li>
+            <input type="checkbox" name="file" value="{{ file }}">
+            <a href="{{ url_for('uploaded_file', filename=file) }}">{{ file }}</a>
+        </li>
         {% endfor %}
     </ul>
 

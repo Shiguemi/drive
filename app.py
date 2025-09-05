@@ -41,6 +41,18 @@ def list_files():
     files = os.listdir(app.config['UPLOAD_FOLDER'])
     return {'files': files}
 
+@app.route('/delete', methods=['POST'])
+def delete_files():
+    data = request.get_json()
+    files_to_delete = data.get('files', [])
+    for filename in files_to_delete:
+        if '/' in filename or '\\' in filename:
+            continue
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    return {'message': 'Files deleted successfully'}
+
 if __name__ == "__main__":
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
