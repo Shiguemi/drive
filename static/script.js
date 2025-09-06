@@ -2,6 +2,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadForm = document.getElementById('upload-form');
     const fileInput = document.getElementById('file-input');
     const uploadStatus = document.getElementById('upload-status');
+    const progressWrapper = document.getElementById('progress-wrapper');
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercentage = document.getElementById('progress-percentage');
     const fileList = document.getElementById('file-list');
     const deleteButton = document.getElementById('delete-button');
 
@@ -66,30 +69,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    uploadForm.addEventListener('submit', async (e) => {
+    uploadForm.addEventListener('submit', (e) => {
         e.preventDefault();
+
+        const file = fileInput.files[0];
+        if (!file) {
+            uploadStatus.textContent = 'Please select a file to upload.';
+            return;
+        }
+
         const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
+        formData.append('file', file);
 
-        uploadStatus.textContent = 'Uploading...';
+        const xhr = new XMLHttpRequest();
 
-        try {
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
-            });
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const percentage = Math.round((e.loaded / e.total) * 100);
+                progressWrapper.style.display = 'block';
+                progressBar.value = percentage;
+                progressPercentage.textContent = `${percentage}%`;
+            }
+        });
 
-            if (response.ok) {
+        xhr.addEventListener('load', () => {
+            if (xhr.status === 200) {
                 uploadStatus.textContent = 'Upload successful!';
                 fileInput.value = '';
                 fetchFiles();
             } else {
-                const error = await response.text();
-                uploadStatus.textContent = `Upload failed: ${error}`;
+                uploadStatus.textContent = `Upload failed: ${xhr.statusText}`;
             }
-        } catch (error) {
-            uploadStatus.textContent = `Upload failed: ${error.message}`;
-        }
+            setTimeout(() => {
+                progressWrapper.style.display = 'none';
+            }, 2000);
+        });
+
+        xhr.addEventListener('error', () => {
+            uploadStatus.textContent = 'Upload failed.';
+            progressWrapper.style.display = 'none';
+        });
+
+        xhr.open('POST', '/upload', true);
+        xhr.send(formData);
+
+        uploadStatus.textContent = 'Uploading...';
     });
 
     fetchFiles();
