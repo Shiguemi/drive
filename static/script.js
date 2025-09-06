@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressWrapper = document.getElementById('progress-wrapper');
     const progressBar = document.getElementById('progress-bar');
     const progressPercentage = document.getElementById('progress-percentage');
+    const transferSpeedElem = document.getElementById('transfer-speed');
+    const timeRemainingElem = document.getElementById('time-remaining');
     const fileList = document.getElementById('file-list');
     const deleteButton = document.getElementById('delete-button');
 
@@ -82,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('file', file);
 
         const xhr = new XMLHttpRequest();
+        let startTime = Date.now();
 
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
@@ -89,6 +92,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 progressWrapper.style.display = 'block';
                 progressBar.value = percentage;
                 progressPercentage.textContent = `${percentage}%`;
+
+                const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
+                if (elapsedTime > 0) {
+                    const transferSpeed = e.loaded / elapsedTime; // bytes per second
+                    const remainingBytes = e.total - e.loaded;
+                    const timeRemaining = remainingBytes / transferSpeed;
+
+                    transferSpeedElem.textContent = `${(transferSpeed / 1024 / 1024).toFixed(2)} MB/s`;
+                    if (isFinite(timeRemaining)) {
+                        timeRemainingElem.textContent = `${Math.round(timeRemaining)}s remaining`;
+                    } else {
+                        timeRemainingElem.textContent = 'Calculating...';
+                    }
+                } else {
+                    transferSpeedElem.textContent = '0.00 MB/s';
+                    timeRemainingElem.textContent = 'Calculating...';
+                }
             }
         });
 
