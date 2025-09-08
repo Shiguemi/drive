@@ -5,8 +5,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressWrapper = document.getElementById('progress-wrapper');
     const progressBar = document.getElementById('progress-bar');
     const progressPercentage = document.getElementById('progress-percentage');
+    const uploadSpeed = document.getElementById('upload-speed');
+    const timeRemaining = document.getElementById('time-remaining');
     const fileList = document.getElementById('file-list');
     const deleteButton = document.getElementById('delete-button');
+
+    let uploadStartTime;
+
+    const formatTime = (seconds) => {
+        if (seconds === Infinity) return 'Estimating...';
+        if (seconds < 60) return `${Math.round(seconds)}s remaining`;
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.round(seconds % 60);
+        return `${minutes}m ${remainingSeconds}s remaining`;
+    };
 
     const fetchFiles = async () => {
         const response = await fetch('/files');
@@ -82,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('file', file);
 
         const xhr = new XMLHttpRequest();
+        uploadStartTime = Date.now();
 
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
@@ -89,6 +102,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 progressWrapper.style.display = 'block';
                 progressBar.value = percentage;
                 progressPercentage.textContent = `${percentage}%`;
+
+                const elapsedTime = (Date.now() - uploadStartTime) / 1000; // in seconds
+                const speed = e.loaded / elapsedTime; // bytes per second
+                const speedMbps = (speed * 8 / 1024 / 1024).toFixed(2);
+                uploadSpeed.textContent = `${speedMbps} Mbps`;
+
+                const remainingBytes = e.total - e.loaded;
+                const remainingTime = remainingBytes / speed; // in seconds
+                timeRemaining.textContent = formatTime(remainingTime);
             }
         });
 

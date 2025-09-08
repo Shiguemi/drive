@@ -28,3 +28,19 @@ h1, h2 {
 #file-list a:hover {
     text-decoration: underline;
 }
+
+#progress-wrapper {
+    width: 100%;
+    margin-bottom: 1em;
+}
+
+#progress-wrapper progress {
+    width: 100%;
+}
+
+#progress-wrapper #upload-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9em;
+    color: #555;
+}
