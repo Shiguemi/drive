@@ -1,7 +1,10 @@
 import os
 import datetime
-from flask import Flask, flash, request, redirect, url_for, send_from_directory, render_template
+import logging
+from flask import Flask, flash, request, redirect, url_for, send_from_directory, render_template, jsonify
 from werkzeug.utils import secure_filename
+
+logging.basicConfig(level=logging.INFO)
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'mp4', 'zip', '7z', '.gz', 'tgz'}
@@ -45,17 +48,45 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    if 'file' not in request.files:
-        flash('No file part')
-        return redirect(request.url)
-    file = request.files['file']
-    if file.filename == '':
-        flash('No selected file')
-        return redirect(request.url)
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        return redirect(url_for('index'))
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename == '':
+            flash('No selected file')
+            return redirect(request.url)
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            return redirect(url_for('index'))
+
+    filename = secure_filename(request.args.get('filename'))
+    if not filename:
+        return 'No filename provided', 400
+
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    logging.info(f"Writing chunk to {filepath}")
+    logging.info(f"Chunk size: {len(request.data)}")
+
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
+
+    with open(filepath, 'ab') as f:
+        f.write(request.data)
+
+    logging.info(f"File size after write: {os.path.getsize(filepath)}")
+
+    return 'Chunk uploaded', 200
+
+@app.route('/status')
+def status():
+    filename = secure_filename(request.args.get('filename'))
+    if not filename:
+        return 'No filename provided', 400
+
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(filepath):
+        return jsonify({'size': os.path.getsize(filepath)})
+    else:
+        return jsonify({'size': 0})
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
@@ -83,4 +114,4 @@ def delete_files():
 if __name__ == "__main__":
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)

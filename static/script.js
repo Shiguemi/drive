@@ -9,8 +9,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const timeRemaining = document.getElementById('time-remaining');
     const fileList = document.getElementById('file-list');
     const deleteButton = document.getElementById('delete-button');
+    const pauseButton = document.getElementById('pause-button');
+    const resumeButton = document.getElementById('resume-button');
 
     let uploadStartTime;
+    let currentFile = null;
+    let isPaused = false;
+    let currentChunk = 0;
+    const CHUNK_SIZE = 1024 * 1024; // 1MB
 
     const formatTime = (seconds) => {
         if (seconds === Infinity) return 'Estimating...';
@@ -21,32 +27,35 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const fetchFiles = async () => {
-        const response = await fetch('/files');
-        const data = await response.json();
-        const tableBody = fileList.getElementsByTagName('tbody')[0];
-        tableBody.innerHTML = '';
-        data.files.forEach(file => {
-            const row = tableBody.insertRow();
+        try {
+            const response = await fetch('/files');
+            const data = await response.json();
+            const tableBody = fileList.getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = '';
+            data.files.forEach(file => {
+                const row = tableBody.insertRow();
+                const cell1 = row.insertCell(0);
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'file';
+                checkbox.value = file.name;
+                cell1.appendChild(checkbox);
 
-            const cell1 = row.insertCell(0);
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.name = 'file';
-            checkbox.value = file.name;
-            cell1.appendChild(checkbox);
+                const cell2 = row.insertCell(1);
+                const a = document.createElement('a');
+                a.href = `/uploads/${file.name}`;
+                a.textContent = file.name;
+                cell2.appendChild(a);
 
-            const cell2 = row.insertCell(1);
-            const a = document.createElement('a');
-            a.href = `/uploads/${file.name}`;
-            a.textContent = file.name;
-            cell2.appendChild(a);
+                const cell3 = row.insertCell(2);
+                cell3.textContent = file.date;
 
-            const cell3 = row.insertCell(2);
-            cell3.textContent = file.date;
-
-            const cell4 = row.insertCell(3);
-            cell4.textContent = file.size;
-        });
+                const cell4 = row.insertCell(3);
+                cell4.textContent = file.size;
+            });
+        } catch (error) {
+            console.error('Error fetching files:', error);
+        }
     };
 
     deleteButton.addEventListener('click', async () => {
@@ -64,9 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/delete', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ files: selectedFiles })
             });
 
@@ -81,61 +88,101 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    uploadForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-
-        const file = fileInput.files[0];
-        if (!file) {
-            uploadStatus.textContent = 'Please select a file to upload.';
+    const uploadChunk = async (file, start) => {
+        if (isPaused) {
             return;
         }
 
-        const formData = new FormData();
-        formData.append('file', file);
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+        currentChunk = start;
 
-        const xhr = new XMLHttpRequest();
+        try {
+            const response = await fetch(`/upload?filename=${file.name}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/octet-stream'
+                },
+                body: chunk
+            });
+
+            if (!response.ok) {
+                throw new Error('Chunk upload failed');
+            }
+
+            const percentage = Math.round((end / file.size) * 100);
+            progressBar.value = percentage;
+            progressPercentage.textContent = `${percentage}%`;
+
+            const elapsedTime = (Date.now() - uploadStartTime) / 1000;
+            const speed = end / elapsedTime;
+            const speedMbps = (speed * 8 / 1024 / 1024).toFixed(2);
+            uploadSpeed.textContent = `${speedMbps} Mbps`;
+
+            const remainingBytes = file.size - end;
+            const remainingTime = remainingBytes / speed;
+            timeRemaining.textContent = formatTime(remainingTime);
+
+            if (end < file.size) {
+                uploadChunk(file, end);
+            } else {
+                uploadStatus.textContent = 'Upload complete!';
+                currentFile = null;
+                fetchFiles();
+                setTimeout(() => {
+                    progressWrapper.style.display = 'none';
+                }, 2000);
+            }
+        } catch (error) {
+            uploadStatus.textContent = `Upload failed: ${error.message}. Retrying...`;
+            setTimeout(() => uploadChunk(file, start), 3000);
+        }
+    };
+
+    const startUpload = async (file) => {
+        isPaused = false;
+        pauseButton.disabled = false;
+        resumeButton.disabled = true;
+        uploadStatus.textContent = 'Uploading...';
+        progressWrapper.style.display = 'block';
         uploadStartTime = Date.now();
 
-        xhr.upload.addEventListener('progress', (e) => {
-            if (e.lengthComputable) {
-                const percentage = Math.round((e.loaded / e.total) * 100);
-                progressWrapper.style.display = 'block';
-                progressBar.value = percentage;
-                progressPercentage.textContent = `${percentage}%`;
+        try {
+            const response = await fetch(`/status?filename=${file.name}`);
+            const data = await response.json();
+            const start = data.size || 0;
+            uploadChunk(file, start);
+        } catch (error) {
+            uploadStatus.textContent = 'Could not get upload status.';
+        }
+    };
 
-                const elapsedTime = (Date.now() - uploadStartTime) / 1000; // in seconds
-                const speed = e.loaded / elapsedTime; // bytes per second
-                const speedMbps = (speed * 8 / 1024 / 1024).toFixed(2);
-                uploadSpeed.textContent = `${speedMbps} Mbps`;
+    uploadForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const file = fileInput.files[0];
+        if (!file) {
+            uploadStatus.textContent = 'Please select a file.';
+            return;
+        }
+        currentFile = file;
+        startUpload(currentFile);
+    });
 
-                const remainingBytes = e.total - e.loaded;
-                const remainingTime = remainingBytes / speed; // in seconds
-                timeRemaining.textContent = formatTime(remainingTime);
-            }
-        });
+    pauseButton.addEventListener('click', () => {
+        isPaused = true;
+        pauseButton.disabled = true;
+        resumeButton.disabled = false;
+        uploadStatus.textContent = 'Upload paused.';
+    });
 
-        xhr.addEventListener('load', () => {
-            if (xhr.status === 200) {
-                uploadStatus.textContent = 'Upload successful!';
-                fileInput.value = '';
-                fetchFiles();
-            } else {
-                uploadStatus.textContent = `Upload failed: ${xhr.statusText}`;
-            }
-            setTimeout(() => {
-                progressWrapper.style.display = 'none';
-            }, 2000);
-        });
-
-        xhr.addEventListener('error', () => {
-            uploadStatus.textContent = 'Upload failed.';
-            progressWrapper.style.display = 'none';
-        });
-
-        xhr.open('POST', '/upload', true);
-        xhr.send(formData);
-
-        uploadStatus.textContent = 'Uploading...';
+    resumeButton.addEventListener('click', () => {
+        if (currentFile) {
+            isPaused = false;
+            pauseButton.disabled = false;
+            resumeButton.disabled = true;
+            uploadStatus.textContent = 'Resuming...';
+            uploadChunk(currentFile, currentChunk);
+        }
     });
 
     fetchFiles();
