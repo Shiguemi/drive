@@ -157,11 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    uploadForm.addEventListener('submit', (e) => {
-        e.preventDefault();
+    fileInput.addEventListener('change', () => {
         const file = fileInput.files[0];
         if (!file) {
-            uploadStatus.textContent = 'Please select a file.';
             return;
         }
         currentFile = file;
